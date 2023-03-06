@@ -142,7 +142,7 @@ int main(int argc,char** argv)
         a[i]=rand()%MAX_NUM;
     }
     
-    fp=fopen("add_stat.xlsx","a");
+    fp=fopen("add_stat_bin.csv","ab");
     if(fp==NULL)
     {
         printf("file open error\n");
