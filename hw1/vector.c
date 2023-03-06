@@ -4,10 +4,11 @@
 #include<time.h>
 
 #define MAX_NUM 1000
-#define MAX_SIZE 100000
+#define MAX_SIZE 10000
 
 int n;
-int a[MAX_SIZE];
+int arr[MAX_SIZE],result[MAX_SIZE];
+int mat[MAX_SIZE][MAX_SIZE];
 //----linux timer----
 #ifdef __linux
 #include<sys/time.h>
@@ -36,85 +37,40 @@ double get_time()
 }
 #endif
 
-void traditional_add()
+void traditional_mul()
 {
-    int result=0;
     set_time(tm_start);
     for(int i=0;i<n;i++)
     {
-        result+=a[i];
+        result[i]=0;
+        for(int j=0;j<n;j++)
+        {
+            result[i]+=mat[j][i]*arr[j];
+        }
     }
     set_time(tm_end);
     printf("traditional time:%fms\n",get_time());
-    printf("traditional res: %d\n",result);
 }
 
-void two_ways_add()
+void cache_opt_mul()
 {
-    int result=0;
     set_time(tm_start);
-    for(int i=0;i<n;i+=2)
+    for(int i=0;i<n;i++)
     {
-        result+=a[i];
-        result+=a[i+1];
+        result[i]=0;
     }
-    set_time(tm_end);
-    printf("two ways time:%fms\n",get_time());
-    printf("two ways res: %d\n",result);
-}
-
-int b[1000];
-int recursion(int size)
-{
-    if(size==1)
+    for(int j=0;j<n;j++)
     {
-        return b[0];
-    }
-    else
-    {
-        for(int i=0;i<size/2;i++)
+        for(int i=0;i<n;i++)
         {
-            b[i]+=b[size-i-1];
-        }
-        size=(size+1)/2;
-        recursion(size);
-    }
-}
-
-void recursion_add()
-{
-    int result=0;
-    memset(b,0,sizeof(b));
-    for(int i=0;i<n;i++) b[i]=a[i];
-
-    set_time(tm_start);
-    result=recursion(n);
-    set_time(tm_end);
-
-    printf("recursion time:%fms\n",get_time());
-    printf("recursion res: %d\n",result);
-}
-
-void loop2_add()
-{
-    int result=0;
-    memset(b,0,sizeof(b));
-    for(int i=0;i<n;i++) b[i]=a[i];
-
-
-    set_time(tm_start);
-    for(int m=n;m>1;m=(m+1)/2)
-    {
-        for(int i=0;i<m/2;i++)
-        {
-            b[i]+=b[m-1-i];
+            result[i]+=mat[j][i]*arr[j];
         }
     }
-    result=b[0];
     set_time(tm_end);
-    printf("loop2 time:%fms\n",get_time());
-    printf("loop2 res: %d\n",result);
+    printf("cache opt time:%fms\n",get_time());
 }
+
+
 
 int main(int argc,char** argv)
 {
@@ -132,12 +88,14 @@ int main(int argc,char** argv)
     }
     for(int i=0;i<n;i++)
     {
-        a[i]=rand()%MAX_NUM;
+        arr[i]=rand()%MAX_NUM;
+        for(int j=0;j<n;j++)
+        {
+            mat[i][j]=rand()%MAX_NUM;
+        }
     }
     
-    traditional_add();
-    two_ways_add();
-    recursion_add();
-    loop2_add();
+    traditional_mul();
+    cache_opt_mul();
     return 0;
 }
