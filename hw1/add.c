@@ -8,6 +8,8 @@
 
 int n;
 int a[MAX_SIZE];
+int b[MAX_SIZE];//as a helper
+
 //----linux timer----
 #ifdef __linux
 #include<sys/time.h>
@@ -63,7 +65,6 @@ void two_ways_add()
     printf("two ways res: %d\n",result);
 }
 
-int b[1000];
 int recursion(int size)
 {
     if(size==1)

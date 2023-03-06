@@ -10,7 +10,7 @@ int n;
 int arr[MAX_SIZE],result[MAX_SIZE];
 int result2[MAX_SIZE];
 int mat[MAX_SIZE][MAX_SIZE];
-//----linux timer----
+
 #ifdef __linux
 #include<sys/time.h>
 struct timeval tm_start,tm_end;
@@ -23,7 +23,7 @@ double get_time()
 }
 #endif
 
-//----windows timer----
+
 #ifdef _WIN32
 #include<windows.h>
 LARGE_INTEGER tm_start,tm_end,tm_freq;
