@@ -9,6 +9,8 @@
 int n;
 int a[MAX_SIZE];
 int b[MAX_SIZE];//as a helper
+int offset=0;
+FILE* fp;
 
 //----linux timer----
 #ifdef __linux
@@ -47,7 +49,8 @@ void traditional_add()
         result+=a[i];
     }
     set_time(tm_end);
-    printf("traditional time:%fms\n",get_time());
+    // printf("traditional time:%fms\n",get_time());
+    fprintf(fp,"%f\t",get_time());
     printf("traditional res: %d\n",result);
 }
 
@@ -61,7 +64,8 @@ void two_ways_add()
         result+=a[i+1];
     }
     set_time(tm_end);
-    printf("two ways time:%fms\n",get_time());
+    // printf("two ways time:%fms\n",get_time());
+    fprintf(fp,"%f\t",get_time());
     printf("two ways res: %d\n",result);
 }
 
@@ -92,7 +96,8 @@ void recursion_add()
     result=recursion(n);
     set_time(tm_end);
 
-    printf("recursion time:%fms\n",get_time());
+    // printf("recursion time:%fms\n",get_time());
+    fprintf(fp,"%f\t",get_time());
     printf("recursion res: %d\n",result);
 }
 
@@ -113,7 +118,8 @@ void loop2_add()
     }
     result=b[0];
     set_time(tm_end);
-    printf("loop2 time:%fms\n",get_time());
+    // printf("loop2 time:%fms\n",get_time());
+    fprintf(fp,"%f\t",get_time());
     printf("loop2 res: %d\n",result);
 }
 
@@ -136,9 +142,32 @@ int main(int argc,char** argv)
         a[i]=rand()%MAX_NUM;
     }
     
+    fp=fopen("add_stat.xlsx","a");
+    if(fp==NULL)
+    {
+        printf("file open error\n");
+        return 0;
+    }
+
+    // fseek(fp,0,0);
+    long pos=ftell(fp);
+    if(pos==-1)
+    {
+        printf("pos error\n");
+        return 0;
+    }
+    else if(pos==0)
+    {
+        fprintf(fp,"\t%s\t%s\t%s\t%s\n","traditional","two_ways","recursion","loop2");
+    }
+
+    fprintf(fp,"%s\t",argv[0]);
     traditional_add();
     two_ways_add();
     recursion_add();
     loop2_add();
+
+    fprintf(fp,"size:%d\n",n);
+    fclose(fp);
     return 0;
 }
