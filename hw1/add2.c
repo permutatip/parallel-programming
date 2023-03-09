@@ -9,7 +9,6 @@
 int n;
 int a[MAX_SIZE];
 int b[MAX_SIZE];//as a helper
-int offset=0;
 FILE* fp;
 
 //----linux timer----
@@ -40,23 +39,26 @@ double get_time()
 }
 #endif
 
-void traditional_add()
-{
-    int result=0;
-    set_time(tm_start);
-    for(int i=0;i<n;i++)
-    {
-        result+=a[i];
-    }
-    set_time(tm_end);
-    // printf("traditional time:%fms\n",get_time());
-    fprintf(fp,"%f\t",get_time());
-    printf("traditional res: %d\n",result);
-}
-
 void two_ways_add()
 {
-    int result,res1=0,res2=0;
+    int result=0;
+    int i=0;
+    set_time(tm_start);
+    for(;i+1<n;i+=2)
+    {
+        result+=a[i];
+        result+=a[i+1];
+    }
+    for(;i<n;i++) result+=a[i];
+    set_time(tm_end);
+    // printf("two ways time:%fms\n",get_time());
+    fprintf(fp,"%f\t",get_time());
+    printf("two ways res: %d\n",result);
+}
+
+void two_ways_new_add()
+{
+    int result=0,res1=0,res2=0;
     int i=0;
     set_time(tm_start);
     for(;i+1<n;i+=2)
@@ -72,59 +74,8 @@ void two_ways_add()
     printf("two ways res: %d\n",result);
 }
 
-int recursion(int size)
-{
-    if(size==1)
-    {
-        return b[0];
-    }
-    else
-    {
-        for(int i=0;i<size/2;i++)
-        {
-            b[i]+=b[size-i-1];
-        }
-        size=(size+1)/2;
-        recursion(size);
-    }
-}
-
-void recursion_add()
-{
-    int result=0;
-    memset(b,0,sizeof(b));
-    for(int i=0;i<n;i++) b[i]=a[i];
-
-    set_time(tm_start);
-    result=recursion(n);
-    set_time(tm_end);
-
-    // printf("recursion time:%fms\n",get_time());
-    fprintf(fp,"%f\t",get_time());
-    printf("recursion res: %d\n",result);
-}
-
-void loop2_add()
-{
-    int result=0;
-    memset(b,0,sizeof(b));
-    for(int i=0;i<n;i++) b[i]=a[i];
 
 
-    set_time(tm_start);
-    for(int m=n;m>1;m=(m+1)/2)
-    {
-        for(int i=0;i<m/2;i++)
-        {
-            b[i]+=b[m-1-i];
-        }
-    }
-    result=b[0];
-    set_time(tm_end);
-    // printf("loop2 time:%fms\n",get_time());
-    fprintf(fp,"%f\t",get_time());
-    printf("loop2 res: %d\n",result);
-}
 
 int main(int argc,char** argv)
 {
@@ -145,7 +96,7 @@ int main(int argc,char** argv)
         a[i]=rand()%MAX_NUM;
     }
     
-    fp=fopen("add_stat.txt","a");
+    fp=fopen("add_stat2.txt","a");
     if(fp==NULL)
     {
         printf("file open error\n");
@@ -161,14 +112,12 @@ int main(int argc,char** argv)
     }
     else if(pos==0)
     {
-        fprintf(fp,"\t%s\t%s\t%s\t%s\n","traditional","two_ways","recursion","loop2");
+        fprintf(fp,"\t%s\t%s\n","two_ways","two_ways_new");
     }
 
     fprintf(fp,"%s\t",argv[0]);
-    traditional_add();
     two_ways_add();
-    recursion_add();
-    loop2_add();
+    two_ways_new_add();
 
     fprintf(fp,"size:%d\n",n);
     fclose(fp);
