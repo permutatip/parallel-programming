@@ -5,16 +5,24 @@
 
 int main()
 {
-    __m128 pad[10];
-    float p[2][41];
-    for(int i=0;i<41;i++) p[1][i]=1.0f*i,p[0][i]=0.5f*i;
-    for(int i=0;i<10;i++) pad[i]=_mm_load_ps(p[1]+i*4+1);
+    __m256 pad[2][10];
+    float p[2][80];
+    for(int i=0;i<80;i++) p[1][i]=1.3f*i,p[0][i]=0.6f*i;
+    printf("%p %p\n",p[0],p[0]+8);
+    for(int i=0;i<10;i++) pad[0][i]=_mm256_loadu_ps(p[0]+i*8);
+    for(int i=0;i<10;i++) pad[1][i]=_mm256_loadu_ps(p[1]+i*8);
     for(int i=0;i<10;i++)
     {
-        pad[i]=_mm_add_ss(pad[i],pad[i]);
+        pad[0][i]=_mm256_add_ps(pad[0][i],pad[0][i]);
+        pad[1][i]=_mm256_add_ps(pad[1][i],pad[1][i]);
     }
-    for(int i=0;i<10;i++) _mm_store_ss(p[1]+i*4+1,pad[i]);
-    for(int i=0;i<41;i++) printf("%.4f ",p[1][i]);
+    for(int i=0;i<10;i++) _mm256_storeu_ps(p[0]+i*8,pad[0][i]);
+    for(int i=0;i<10;i++) _mm256_storeu_ps(p[1]+i*8,pad[1][i]);
+    // for(int i=0;i<80;i++) printf("%.4f %.4f\n",p[0][i],p[1][i]);
+
+    // float small[8];
+    // for(int i=0;i<8;i++) small[i]=1.2f*i;
+    // __m256 pad=_mm256_loadu_ps(small);
     printf("\n");
 
     return 0;
