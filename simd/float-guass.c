@@ -36,7 +36,7 @@ double get_time()
 #endif
 // no timer
 #ifndef set_time
-#error "Not linux or windows, can not perform."
+#error "Not linux or windows, can not excute."
 #endif
 
 float **alloc_mat(int size)
@@ -110,7 +110,7 @@ float **common_guass(int size, float **mat)
     }
 
     set_time(tm_end);
-    printf("common guass: size:%d time:%fms\n", size, get_time());
+    printf("common guass:\tsize:%d\t\ttime:%fms\n", size, get_time());
     return m;
 }
 
@@ -128,21 +128,85 @@ float **simd_alianed128_guass(int size, float **mat)
             m[k][j] = m[k][j] / m[k][k];
         }
         m[k][k] = 1.0;
+
+        assert(size%4==0);//to simplify the problem
         for (int i = k + 1; i < size; i++)
         {
-            for (int j = k + 1; j < size; j++)
+            int pad_size=(size-k-1)/4;
+            int beg_ind=size-pad_size*4;
+            //not aligned part
+            for(int j=k+1;j<beg_ind;j++)
             {
-                // m[i][j] = m[i][j] - m[i][k] * m[k][j];
-                __m128* m_i,m_ik,m_k;
-                // int pad_size=(size-k-1);
-                // for(int x=0;x<pad_size;x++) m_k[i]=_mm_load_ps(m[k]+j+4*x);
+                m[i][j] = m[i][j] - m[i][k] * m[k][j];
+            }
+            //aligned part
+            __m128 m_ik=_mm_set_ps1(m[i][k]);//const part
+            __m128* m_k=malloc(sizeof(__m128)*pad_size);//row k
+            __m128* m_i=malloc(sizeof(__m128)*pad_size);//row i
+            for (int j = 0; j < pad_size; j++)
+            {
+                m_k[j]=_mm_load_ps(m[k]+beg_ind+4*j);
+                m_i[j]=_mm_load_ps(m[i]+beg_ind+4*j);
 
+                // m[i][j] = m[i][j] - m[i][k] * m[k][j];
+                m_k[j]=_mm_mul_ps(m_ik,m_k[j]);
+                m_i[j]=_mm_sub_ps(m_i[j],m_k[j]);
+
+                _mm_store_ps(m[i]+beg_ind+4*j,m_i[j]);
             }
             m[i][k] = 0;
         }
     }
     set_time(tm_end);
-    printf("simd aligned128 guass: size:%d time:%fms\n", size, get_time());
+    printf("aligned128 guass:\tsize:%d\t\ttime:%fms\n", size, get_time());
+    return m;
+}
+
+float **simd_alianed256_guass(int size, float **mat)
+{
+    float **m = copy_mat(size, mat);
+
+    set_time(tm_start);
+
+    for (int k = 0; k < size; k++)
+    {
+        assert(m[k][k] != 0);
+        for (int j = k + 1; j < size; j++)
+        {
+            m[k][j] = m[k][j] / m[k][k];
+        }
+        m[k][k] = 1.0;
+
+        assert(size%8==0);//to simplify the problem
+        for (int i = k + 1; i < size; i++)
+        {
+            int pad_size=(size-k-1)/8;
+            int beg_ind=size-pad_size*8;
+            //not aligned part
+            for(int j=k+1;j<beg_ind;j++)
+            {
+                m[i][j] = m[i][j] - m[i][k] * m[k][j];
+            }
+            //aligned part
+            __m256 m_ik=_mm256_set1_ps(m[i][k]);//const part
+            __m256* m_k=malloc(sizeof(__m256)*pad_size);//row k
+            __m256* m_i=malloc(sizeof(__m256)*pad_size);//row i
+            for (int j = 0; j < pad_size; j++)
+            {
+                m_k[j]=_mm256_load_ps(m[k]+beg_ind+4*j);
+                m_i[j]=_mm256_load_ps(m[i]+beg_ind+4*j);
+
+                // m[i][j] = m[i][j] - m[i][k] * m[k][j];
+                m_k[j]=_mm256_mul_ps(m_ik,m_k[j]);
+                m_i[j]=_mm256_sub_ps(m_i[j],m_k[j]);
+
+                _mm256_store_ps(m[i]+beg_ind+4*j,m_i[j]);
+            }
+            m[i][k] = 0;
+        }
+    }
+    set_time(tm_end);
+    printf("aligned256 guass: size:%d\t\t\ttime:%fms\n", size, get_time());
     return m;
 }
 
@@ -179,24 +243,31 @@ int comp_mat_with_iden(int size, float **mat)
     return 1;
 }
 
+void test_size(int n)
+{
+    float **mat = alloc_mat(n);
+    shuffle_mat(n, mat);
+
+
+    float **mat_g = common_guass(n, mat);
+    float **mat2_g = simd_alianed128_guass(n, mat);
+    float **mat3_g = simd_alianed256_guass(n, mat);
+    assert(comp_mat_with_iden(n, mat_g));
+    assert(comp_mat_with_iden(n, mat2_g));
+    assert(comp_mat_with_iden(n, mat3_g));
+}
+
 int main()
 {
     srand(time(0));
-    int n = 100;
+    int n = 120;
 
     while (n < 1001)
     {
-        float **mat = alloc_mat(n);
-        float **m2 = copy_mat(n, mat);
-        assert(comp_mat(n, mat, m2));
-
-        shuffle_mat(n, mat);
-        float **mat_g = common_guass(n, mat);
-        // float **mat2_g = simd_alianed128_guass(n, mat);
-        assert(comp_mat_with_iden(n, mat_g));
+        test_size(n);
 
         if (n < 1000)
-            n += 100;
+            n += 80;
         else
             n += 1000;
     }
