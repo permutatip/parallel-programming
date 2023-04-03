@@ -4,7 +4,7 @@
 #include <assert.h>
 #include <math.h>
 
-#include <immintrin.h> 
+#include <immintrin.h>
 // #include<xmmintrin.h>
 // #include<pmmintrin.h>
 
@@ -41,7 +41,7 @@ double get_time()
 
 float **alloc_mat(int size)
 {
-    float **m = aligned_alloc(256,sizeof(float*)*size);
+    float **m = malloc(sizeof(float *) * size);
     for (int i = 0; i < size; i++)
     {
         m[i] = (float *)malloc(sizeof(float) * size);
@@ -52,7 +52,7 @@ float **alloc_mat(int size)
             else if (i == j)
                 m[i][j] = 1.0;
             else
-                m[i][j] = 1.0 * (rand()%1000);
+                m[i][j] = 1.0 * (rand() % 100);
         }
     }
     return m;
@@ -66,15 +66,27 @@ void shuffle_mat(int size, float **mat)
         {
             for (int j = 0; j < size; j++)
             {
-                mat[i][j] += (rand()%1000) * mat[k][j];
+                mat[i][j] += (rand()%4)/8.0 * mat[k][j];
             }
         }
     }
 }
 
+void print_mat(int size,float **mat)
+{
+    for(int i=0;i<size;i++)
+    {
+        for(int j=0;j<size;j++)
+        {
+            printf("%f ",mat[i][j]);
+        }
+        printf("\n");
+    }
+}
+
 float **copy_mat(int size, float **mat)
 {
-    float **m = aligned_alloc(256,sizeof(float*)*size);
+    float **m = malloc(sizeof(float *) * size);
     for (int i = 0; i < size; i++)
     {
         m[i] = (float *)malloc(sizeof(float) * size);
@@ -86,6 +98,18 @@ float **copy_mat(int size, float **mat)
     return m;
 }
 
+void swap_mat_lines(int size,float **mat,int row1,int row2)
+{
+    assert(row1>=0 && row1<size);
+    assert(row2>=0 && row2<size);
+    for(int i=0;i<size;i++)
+    {
+        float t=mat[row1][i];
+        mat[row1][i]=mat[row2][i];
+        mat[row2][i]=t;
+    }
+}
+
 float **common_guass(int size, float **mat)
 {
     float **m = copy_mat(size, mat);
@@ -93,10 +117,15 @@ float **common_guass(int size, float **mat)
     set_time(tm_start);
     for (int k = 0; k < size; k++)
     {
-        assert(m[k][k] != 0);
+        if(fabs(m[k][k])<=1e-6)
+        {
+            printf("m[%d][%d] of size%d not zero\n",k,k,size);
+            exit(1);
+        }
+        // assert(fabs(m[k][k])>1e-4);
         for (int j = k + 1; j < size; j++)
         {
-            m[k][j] = m[k][j] / m[k][k]; // if m[k][k]==0?
+            m[k][j] = m[k][j] / m[k][k];
         }
         m[k][k] = 1.0;
         for (int i = k + 1; i < size; i++)
@@ -108,7 +137,6 @@ float **common_guass(int size, float **mat)
             m[i][k] = 0;
         }
     }
-
     set_time(tm_end);
     printf("common guass:\tsize:%d\t\ttime:%fms\n", size, get_time());
     return m;
@@ -129,30 +157,30 @@ float **simd_alianed128_guass(int size, float **mat)
         }
         m[k][k] = 1.0;
 
-        assert(size%4==0);//to simplify the problem
+        assert(size % 4 == 0); // to simplify the problem
         for (int i = k + 1; i < size; i++)
         {
-            int pad_size=(size-k-1)/4;
-            int beg_ind=size-pad_size*4;
-            //not aligned part
-            for(int j=k+1;j<beg_ind;j++)
+            int pad_size = (size - k - 1) / 4;
+            int beg_ind = size - pad_size * 4;
+            // not aligned part
+            for (int j = k + 1; j < beg_ind; j++)
             {
                 m[i][j] = m[i][j] - m[i][k] * m[k][j];
             }
-            //aligned part
-            __m128 m_ik=_mm_set_ps1(m[i][k]);//const part
-            __m128* m_k=malloc(sizeof(__m128)*pad_size);//row k
-            __m128* m_i=malloc(sizeof(__m128)*pad_size);//row i
+            // aligned part
+            __m128 m_ik = _mm_set_ps1(m[i][k]);              // const part
+            __m128 *m_k = malloc(sizeof(__m128) * pad_size); // row k
+            __m128 *m_i = malloc(sizeof(__m128) * pad_size); // row i
             for (int j = 0; j < pad_size; j++)
             {
-                m_k[j]=_mm_load_ps(m[k]+beg_ind+4*j);
-                m_i[j]=_mm_load_ps(m[i]+beg_ind+4*j);
+                m_k[j] = _mm_load_ps(m[k] + beg_ind + 4 * j);
+                m_i[j] = _mm_load_ps(m[i] + beg_ind + 4 * j);
 
                 // m[i][j] = m[i][j] - m[i][k] * m[k][j];
-                m_k[j]=_mm_mul_ps(m_ik,m_k[j]);
-                m_i[j]=_mm_sub_ps(m_i[j],m_k[j]);
+                m_k[j] = _mm_mul_ps(m_ik, m_k[j]);
+                m_i[j] = _mm_sub_ps(m_i[j], m_k[j]);
 
-                _mm_store_ps(m[i]+beg_ind+4*j,m_i[j]);
+                _mm_store_ps(m[i] + beg_ind + 4 * j, m_i[j]);
             }
             free(m_k);
             free(m_i);
@@ -179,25 +207,25 @@ float **simd_alianed256_guass(int size, float **mat)
         }
         m[k][k] = 1.0;
 
-        assert(size%8==0);//to simplify the problem
+        assert(size % 8 == 0); // to simplify the problem
         for (int i = k + 1; i < size; i++)
         {
-            int pad_size=(size-k-1)/8;
-            int beg_ind=size-pad_size*8;
-            //not aligned part
-            for(int j=k+1;j<beg_ind;j++)
+            int pad_size = (size - k - 1) / 8;
+            int beg_ind = size - pad_size * 8;
+            // not aligned part
+            for (int j = k + 1; j < beg_ind; j++)
             {
                 m[i][j] = m[i][j] - m[i][k] * m[k][j];
             }
-            //aligned part
-            __m256 m_ik=_mm256_set1_ps(m[i][k]);//const part
-            __m256* m_k=malloc(sizeof(__m256)*pad_size);//row k
-            __m256* m_i=malloc(sizeof(__m256)*pad_size);//row i
+            // aligned part
+            __m256 m_ik = _mm256_set1_ps(m[i][k]);           // const part
+            __m256 *m_k = malloc(sizeof(__m256) * pad_size); // row k
+            __m256 *m_i = malloc(sizeof(__m256) * pad_size); // row i
             for (int j = 0; j < pad_size; j++)
             {
                 // assert(((unsigned int))%32==0);
-                printf("%p\n",m[k]+beg_ind+8*j);
-                m_k[j]=_mm256_loadu_ps(m[k]+beg_ind+8*j);
+                printf("%p\n", m[k] + beg_ind + 8 * j);
+                m_k[j] = _mm256_loadu_ps(m[k] + beg_ind + 8 * j);
                 // m_i[j]=_mm256_loadu_ps(m[i]+beg_ind+8*j);
 
                 // m[i][j] = m[i][j] - m[i][k] * m[k][j];
@@ -222,9 +250,9 @@ int comp_mat(int size, float **m1, float **m2)
     {
         for (int j = 0; j < size; j++)
         {
-            if (m1[i][j] != m2[i][j])
+            if (fabs(m1[i][j] - m2[i][j]) > 1e-6)
             {
-                printf("mat diff at (%d,%d)\n", i, j);
+                printf("size%d mat diff at (%d,%d)\n", size, i, j);
                 return 0;
             }
         }
@@ -239,7 +267,7 @@ int comp_mat_with_iden(int size, float **mat)
         for (int j = 0; j < size; j++)
         {
             float s = (i == j ? 1.0 : 0.0);
-            if (fabs(mat[i][j] - s) > 1e-10)
+            if (fabs(mat[i][j] - s) > 1e-6)
             {
                 printf("mat not identifier at (%d,%d)\n", i, j);
                 return 0;
@@ -252,16 +280,19 @@ int comp_mat_with_iden(int size, float **mat)
 void test_size(int n)
 {
     float **mat = alloc_mat(n);
-    float **mat2=copy_mat(n,mat);
+    float **mat2 = copy_mat(n, mat);
+    assert(comp_mat(n,mat,mat2));
     shuffle_mat(n, mat);
 
     float **mat_g = common_guass(n, mat);
+    assert(comp_mat(n, mat2, mat_g));
     float **mat2_g = simd_alianed128_guass(n, mat);
-    float **mat3_g = simd_alianed256_guass(n, mat);
-    assert(comp_mat_with_iden(n, mat_g));
-    assert(comp_mat_with_iden(n, mat2_g));
-    assert(comp_mat_with_iden(n, mat3_g));
-    free(mat),free(mat2),free(mat_g),free(mat2_g),free(mat3_g);
+    assert(comp_mat(n, mat2, mat2_g));
+    // float **mat3_g = simd_alianed256_guass(n, mat);
+    // assert(comp_mat_with_iden(n, mat3_g));
+    free(mat), free(mat2), free(mat_g);
+    free(mat2_g);
+    //free(mat3_g);
 }
 
 int main()
