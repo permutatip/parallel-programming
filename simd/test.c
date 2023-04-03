@@ -3,7 +3,7 @@
 
 #include<immintrin.h>
 
-int main()
+void test_mm256()
 {
     __m256 pad[2][10];
     float p[2][80];
@@ -18,12 +18,11 @@ int main()
     }
     for(int i=0;i<10;i++) _mm256_storeu_ps(p[0]+i*8,pad[0][i]);
     for(int i=0;i<10;i++) _mm256_storeu_ps(p[1]+i*8,pad[1][i]);
-    // for(int i=0;i<80;i++) printf("%.4f %.4f\n",p[0][i],p[1][i]);
+}
 
-    // float small[8];
-    // for(int i=0;i<8;i++) small[i]=1.2f*i;
-    // __m256 pad=_mm256_loadu_ps(small);
-    printf("\n");
+int main()
+{
+    double** m;
 
     return 0;
 }
