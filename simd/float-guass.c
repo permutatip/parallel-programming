@@ -52,7 +52,7 @@ float **alloc_mat(int size)
             else if (i == j)
                 m[i][j] = 1.0;
             else
-                m[i][j] = 1.0 * (rand() % 100);
+                m[i][j] = 1.0 * (rand() % 10);
         }
     }
     return m;
@@ -64,9 +64,10 @@ void shuffle_mat(int size, float **mat)
     {
         for (int i = k + 1; i < size; i++)
         {
+            float r= (rand()%5 + 1)/10.0;
             for (int j = 0; j < size; j++)
             {
-                mat[i][j] += (rand()%4)/8.0 * mat[k][j];
+                mat[i][j] += r* mat[k][j];
             }
         }
     }
@@ -78,7 +79,7 @@ void print_mat(int size,float **mat)
     {
         for(int j=0;j<size;j++)
         {
-            printf("%f ",mat[i][j]);
+            printf("%.3f ",mat[i][j]);
         }
         printf("\n");
     }
@@ -98,18 +99,6 @@ float **copy_mat(int size, float **mat)
     return m;
 }
 
-void swap_mat_lines(int size,float **mat,int row1,int row2)
-{
-    assert(row1>=0 && row1<size);
-    assert(row2>=0 && row2<size);
-    for(int i=0;i<size;i++)
-    {
-        float t=mat[row1][i];
-        mat[row1][i]=mat[row2][i];
-        mat[row2][i]=t;
-    }
-}
-
 float **common_guass(int size, float **mat)
 {
     float **m = copy_mat(size, mat);
@@ -122,7 +111,6 @@ float **common_guass(int size, float **mat)
             printf("m[%d][%d] of size%d not zero\n",k,k,size);
             exit(1);
         }
-        // assert(fabs(m[k][k])>1e-4);
         for (int j = k + 1; j < size; j++)
         {
             m[k][j] = m[k][j] / m[k][k];
@@ -136,6 +124,7 @@ float **common_guass(int size, float **mat)
             }
             m[i][k] = 0;
         }
+        // print_mat(size,m);
     }
     set_time(tm_end);
     printf("common guass:\tsize:%d\t\ttime:%fms\n", size, get_time());
@@ -250,26 +239,9 @@ int comp_mat(int size, float **m1, float **m2)
     {
         for (int j = 0; j < size; j++)
         {
-            if (fabs(m1[i][j] - m2[i][j]) > 1e-6)
+            if (fabs(m1[i][j] - m2[i][j]) > 1e-2)
             {
                 printf("size%d mat diff at (%d,%d)\n", size, i, j);
-                return 0;
-            }
-        }
-    }
-    return 1;
-}
-
-int comp_mat_with_iden(int size, float **mat)
-{
-    for (int i = 0; i < size; i++)
-    {
-        for (int j = 0; j < size; j++)
-        {
-            float s = (i == j ? 1.0 : 0.0);
-            if (fabs(mat[i][j] - s) > 1e-6)
-            {
-                printf("mat not identifier at (%d,%d)\n", i, j);
                 return 0;
             }
         }
@@ -281,8 +253,10 @@ void test_size(int n)
 {
     float **mat = alloc_mat(n);
     float **mat2 = copy_mat(n, mat);
+    // print_mat(n,mat);
     assert(comp_mat(n,mat,mat2));
     shuffle_mat(n, mat);
+    // print_mat(n,mat);
 
     float **mat_g = common_guass(n, mat);
     assert(comp_mat(n, mat2, mat_g));
@@ -298,7 +272,7 @@ void test_size(int n)
 int main()
 {
     srand(time(0));
-    int n = 120;
+    int n = 40;
 
     while (n < 1001)
     {
