@@ -8,6 +8,8 @@
 // #include<xmmintrin.h>
 // #include<pmmintrin.h>
 
+#define EPS 1e-6
+
 //----linux timer----
 #ifdef __linux
 #include <sys/time.h>
@@ -64,7 +66,7 @@ void shuffle_mat(int size, float **mat)
     {
         for (int i = k + 1; i < size; i++)
         {
-            float r = 1.0 / 4.0;
+            float r = (rand()%8) / 4.0;
             for (int j = 0; j < size; j++)
             {
                 mat[i][j] += r * mat[k][j];
@@ -106,7 +108,7 @@ float **common_guass(int size, float **mat)
     set_time(tm_start);
     for (int k = 0; k < size; k++)
     {
-        if (fabs(m[k][k]) <= 1e-6)
+        if (fabs(m[k][k]) <= EPS)
         {
             printf("m[%d][%d] of size%d not zero\n", k, k, size);
             exit(1);
@@ -139,7 +141,11 @@ float **simd_alianed128_guass(int size, float **mat)
 
     for (int k = 0; k < size; k++)
     {
-        assert(m[k][k] != 0);
+        if (fabs(m[k][k]) <= EPS)
+        {
+            printf("m[%d][%d] of size%d not zero\n", k, k, size);
+            exit(1);
+        }
         for (int j = k + 1; j < size; j++)
         {
             m[k][j] = m[k][j] / m[k][k];
@@ -239,7 +245,7 @@ int comp_mat(int size, float **m1, float **m2)
     {
         for (int j = 0; j < size; j++)
         {
-            if (fabs(m1[i][j] - m2[i][j]) > 1e-2)
+            if (fabs(m1[i][j] - m2[i][j]) > EPS)
             {
                 printf("size%d mat diff at (%d,%d)\n", size, i, j);
                 return 0;
@@ -273,6 +279,9 @@ int main()
 {
     srand(time(0));
     int n = 40;
+
+    test_size(8);
+    test_size(16);
 
     while (n < 1001)
     {
