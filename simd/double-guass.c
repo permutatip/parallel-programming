@@ -54,7 +54,7 @@ double **alloc_mat(int size)
             else if (i == j)
                 m[i][j] = 1.0;
             else
-                m[i][j] = 0.5 * (rand() % 10);
+                m[i][j] = rand()%3-1;
         }
     }
     return m;
@@ -66,8 +66,8 @@ void shuffle_mat(int size, double **mat)
     {
         for (int i = k + 1; i < size; i++)
         {
-            // double r = (rand()%8) / 4.0;
-            double r = 2.0;
+            double r = rand()%3 - 1;
+            // double r = 2.0;
             for (int j = 0; j < size; j++)
             {
                 mat[i][j] += r * mat[k][j];
@@ -109,9 +109,9 @@ double **common_guass(int size, double **mat)
     set_time(tm_start);
     for (int k = 0; k < size; k++)
     {
-        if (fabs(m[k][k]) <= 1e-6)
+        if (fabs(m[k][k]) <= EPS)
         {
-            printf("m[%d][%d] of size%d not zero\n", k, k, size);
+            printf("m[%d][%d] of size%d is zero\n", k, k, size);
             exit(1);
         }
         for (int j = k + 1; j < size; j++)
@@ -142,9 +142,9 @@ double **simd_alianed128_guass(int size, double **mat)
 
     for (int k = 0; k < size; k++)
     {
-        if (fabs(m[k][k]) <= 1e-6)
+        if (fabs(m[k][k]) <= EPS)
         {
-            printf("m[%d][%d] of size%d not zero\n", k, k, size);
+            printf("m[%d][%d] of size%d is zero\n", k, k, size);
             exit(1);
         }
         for (int j = k + 1; j < size; j++)
@@ -244,6 +244,7 @@ int comp_mat(int size, double **m1, double **m2)
             if (fabs(m1[i][j] - m2[i][j]) > EPS)
             {
                 printf("size%d mat diff at (%d,%d)\n", size, i, j);
+                printf("m1[i][j]=%f m2[i][j]=%f\n",m1[i][j],m2[i][j]);
                 return 0;
             }
         }
@@ -251,14 +252,32 @@ int comp_mat(int size, double **m1, double **m2)
     return 1;
 }
 
+void print_test_size(int n)
+{
+    double **mat = alloc_mat(n);
+    double **mat2 = copy_mat(n, mat);
+    print_mat(n,mat);
+    assert(comp_mat(n, mat, mat2));
+    shuffle_mat(n, mat);
+    print_mat(n,mat);
+
+    double **mat_g = common_guass(n, mat);
+    assert(comp_mat(n, mat2, mat_g));
+    double **mat2_g = simd_alianed128_guass(n, mat);
+    assert(comp_mat(n, mat2, mat2_g));
+    // double **mat3_g = simd_alianed256_guass(n, mat);
+    // assert(comp_mat_with_iden(n, mat3_g));
+    free(mat), free(mat2), free(mat_g);
+    free(mat2_g);
+    // free(mat3_g);
+}
+
 void test_size(int n)
 {
     double **mat = alloc_mat(n);
     double **mat2 = copy_mat(n, mat);
-    // print_mat(n,mat);
     assert(comp_mat(n, mat, mat2));
     shuffle_mat(n, mat);
-    // print_mat(n,mat);
 
     double **mat_g = common_guass(n, mat);
     assert(comp_mat(n, mat2, mat_g));
@@ -277,7 +296,7 @@ int main()
     int n = 40;
 
     test_size(8);
-    test_size(16);
+    print_test_size(24);
 
     while (n < 1001)
     {

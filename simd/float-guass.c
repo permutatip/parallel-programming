@@ -5,8 +5,6 @@
 #include <math.h>
 
 #include <immintrin.h>
-// #include<xmmintrin.h>
-// #include<pmmintrin.h>
 
 #define EPS 1e-6
 
@@ -54,7 +52,7 @@ float **alloc_mat(int size)
             else if (i == j)
                 m[i][j] = 1.0;
             else
-                m[i][j] = 0.5 * (rand() % 10);
+                m[i][j] = 0.5 * (rand() % 10 - 5);
         }
     }
     return m;
@@ -64,9 +62,9 @@ void shuffle_mat(int size, float **mat)
 {
     for (int k = 0; k < size; k++)
     {
-        for (int i = k + 1; i < size; i++)
+        for (int i = k + 1; i < size ; i++)
         {
-            float r = (rand()%8) / 4.0;
+            float r = rand()%3 - 1;
             for (int j = 0; j < size; j++)
             {
                 mat[i][j] += r * mat[k][j];
@@ -81,7 +79,7 @@ void print_mat(int size, float **mat)
     {
         for (int j = 0; j < size; j++)
         {
-            printf("%.3f ", mat[i][j]);
+            printf("%6.3f ", mat[i][j]);
         }
         printf("\n");
     }
@@ -110,7 +108,7 @@ float **common_guass(int size, float **mat)
     {
         if (fabs(m[k][k]) <= EPS)
         {
-            printf("m[%d][%d] of size%d not zero\n", k, k, size);
+            printf("m[%d][%d] of size%d is zero\n", k, k, size);
             exit(1);
         }
         for (int j = k + 1; j < size; j++)
@@ -143,7 +141,7 @@ float **simd_alianed128_guass(int size, float **mat)
     {
         if (fabs(m[k][k]) <= EPS)
         {
-            printf("m[%d][%d] of size%d not zero\n", k, k, size);
+            printf("m[%d][%d] of size%d is zero\n", k, k, size);
             exit(1);
         }
         for (int j = k + 1; j < size; j++)
@@ -248,13 +246,33 @@ int comp_mat(int size, float **m1, float **m2)
             if (fabs(m1[i][j] - m2[i][j]) > EPS)
             {
                 printf("size%d mat diff at (%d,%d)\n", size, i, j);
+                printf("m1[i][j]=%f m2[i][j]=%f\n",m1[i][j],m2[i][j]);
                 return 0;
             }
         }
     }
     return 1;
 }
+void print_test_size(int n)
+{
+    float **mat = alloc_mat(n);
+    float **mat2 = copy_mat(n, mat);
+    print_mat(n,mat);
+    printf("--------------------\n");
+    assert(comp_mat(n, mat, mat2));
+    shuffle_mat(n, mat);
+    print_mat(n,mat);
 
+    float **mat_g = common_guass(n, mat);
+    assert(comp_mat(n, mat2, mat_g));
+    float **mat2_g = simd_alianed128_guass(n, mat);
+    assert(comp_mat(n, mat2, mat2_g));
+    // float **mat3_g = simd_alianed256_guass(n, mat);
+    // assert(comp_mat_with_iden(n, mat3_g));
+    free(mat), free(mat2), free(mat_g);
+    free(mat2_g);
+    // free(mat3_g);
+}
 void test_size(int n)
 {
     float **mat = alloc_mat(n);
@@ -281,7 +299,8 @@ int main()
     int n = 40;
 
     test_size(8);
-    test_size(16);
+    print_test_size(24);
+    // print_test_size(16);
 
     while (n < 1001)
     {

@@ -22,7 +22,8 @@ void test_mm256()
 
 int main()
 {
-    double** m;
+    // double** m;
+    printf("%lu\n",sizeof(long double));
 
     return 0;
 }
