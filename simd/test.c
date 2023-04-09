@@ -23,7 +23,14 @@ void test_mm256()
 int main()
 {
     // double** m;
-    printf("%lu\n",sizeof(long double));
+    float** m;
+    m=malloc(sizeof(float*)*100);
+    m[0]=malloc(sizeof(float)*100);
+    for(int i=1;i<100;i++)
+    {
+        m[i]=malloc(sizeof(float)*100);
+        printf("%d %d %ld\n",i-1,i,m[i]-m[i-1]);
+    }
 
     return 0;
 }

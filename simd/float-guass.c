@@ -52,7 +52,7 @@ float **alloc_mat(int size)
             else if (i == j)
                 m[i][j] = 1.0;
             else
-                m[i][j] = 0.5 * (rand() % 10 - 5);
+                m[i][j] = rand()%10;
         }
     }
     return m;
@@ -64,7 +64,7 @@ void shuffle_mat(int size, float **mat)
     {
         for (int i = k + 1; i < size ; i++)
         {
-            float r = rand()%3 - 1;
+            float r = (rand()%3-1)/2.0;
             for (int j = 0; j < size; j++)
             {
                 mat[i][j] += r * mat[k][j];
@@ -253,41 +253,19 @@ int comp_mat(int size, float **m1, float **m2)
     }
     return 1;
 }
-void print_test_size(int n)
-{
-    float **mat = alloc_mat(n);
-    float **mat2 = copy_mat(n, mat);
-    print_mat(n,mat);
-    printf("--------------------\n");
-    assert(comp_mat(n, mat, mat2));
-    shuffle_mat(n, mat);
-    print_mat(n,mat);
 
-    float **mat_g = common_guass(n, mat);
-    assert(comp_mat(n, mat2, mat_g));
-    float **mat2_g = simd_alianed128_guass(n, mat);
-    assert(comp_mat(n, mat2, mat2_g));
-    // float **mat3_g = simd_alianed256_guass(n, mat);
-    // assert(comp_mat_with_iden(n, mat3_g));
-    free(mat), free(mat2), free(mat_g);
-    free(mat2_g);
-    // free(mat3_g);
-}
 void test_size(int n)
 {
     float **mat = alloc_mat(n);
     float **mat2 = copy_mat(n, mat);
-    // print_mat(n,mat);
     assert(comp_mat(n, mat, mat2));
     shuffle_mat(n, mat);
-    // print_mat(n,mat);
 
     float **mat_g = common_guass(n, mat);
-    assert(comp_mat(n, mat2, mat_g));
     float **mat2_g = simd_alianed128_guass(n, mat);
-    assert(comp_mat(n, mat2, mat2_g));
+    assert(comp_mat(n, mat_g, mat2_g));
     // float **mat3_g = simd_alianed256_guass(n, mat);
-    // assert(comp_mat_with_iden(n, mat3_g));
+    // assert(comp_mat_with_iden(mat_g, mat3_g));
     free(mat), free(mat2), free(mat_g);
     free(mat2_g);
     // free(mat3_g);
@@ -297,10 +275,6 @@ int main()
 {
     srand(time(0));
     int n = 40;
-
-    test_size(8);
-    print_test_size(24);
-    // print_test_size(16);
 
     while (n < 1001)
     {
