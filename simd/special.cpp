@@ -39,9 +39,9 @@ double get_time()
 #error "Not linux or windows, can not excute."
 #endif
 
-#define COL 130
-#define ELI_NUM 22
-#define TOBE_ELI_NUM 8
+#define COL 1011
+#define ELI_NUM 539
+#define TOBE_ELI_NUM 263
 #define ARR_LEN (COL/31+1)
 
 struct mat_row
@@ -49,14 +49,14 @@ struct mat_row
     /* data */
     int dat[ARR_LEN];
     int first;
-};
+}__attribute__ ((aligned (32)));
 
 mat_row tobe_eli[TOBE_ELI_NUM],elitor[COL+1],ans[TOBE_ELI_NUM];
 
-char line[10000];
-const char path1[]="./Groebner/1_130_22_8/1.txt";//消元子
-const char path2[]="./Groebner/1_130_22_8/2.txt";//被消元行
-const char path3[]="./Groebner/1_130_22_8/3.txt";//消元结果
+char line[10000];//4_1011_539_263
+const char path1[]="./Groebner/4_1011_539_263/1.txt";//消元子
+const char path2[]="./Groebner/4_1011_539_263/2.txt";//被消元行
+const char path3[]="./Groebner/4_1011_539_263/3.txt";//消元结果
 
 void show_mat(mat_row mat[],int len)
 {
@@ -141,14 +141,6 @@ void row_xor(int eli_row,int tobe_eli_row)
     }
     for(int i=ARR_LEN-1;i>=0;i--)
     {
-        // for(int j=30;j>=0;j--)
-        // {
-        //     if(tobe_eli[tobe_eli_row].dat[i]&(1<<j))
-        //     {
-        //         tobe_eli[tobe_eli_row].first=i*31+j;
-        //         return;
-        //     }
-        // }
         //https://www.zhihu.com/question/35361094
         if(tobe_eli[tobe_eli_row].dat[i])
         {
@@ -165,19 +157,41 @@ void sse128_xor(int eli_row,int tobe_eli_row)
     int ii=0;
     for(;ii+4<ARR_LEN;ii+=4)
     {
-        __m128i tobe_pack=_mm_load_si128((__m128i*)tobe_eli[tobe_eli_row].dat+ii);
-        __m128i elitor_pack=_mm_load_si128((__m128i*)elitor[eli_row].dat+ii);
-        tobe_pack=_mm_xor_si128(tobe_pack,elitor_pack);
-        _mm_storeu_si128((__m128i*)tobe_eli[tobe_eli_row].dat+ii,tobe_pack);
+        __m128i tobe_pack=_mm_stream_load_si128((__m128i*)(tobe_eli[tobe_eli_row].dat+ii));
+        __m128i elitor_pack=_mm_stream_load_si128((__m128i*)(elitor[eli_row].dat+ii));
+        __m128i ans_pack=_mm_xor_si128(tobe_pack,elitor_pack);
+        _mm_store_si128((__m128i*)(tobe_eli[tobe_eli_row].dat+ii),ans_pack);
     }
     for(;ii<ARR_LEN;ii++)
     {
         tobe_eli[tobe_eli_row].dat[ii]^=elitor[eli_row].dat[ii];
     }
-    // for(int i=0;i<ARR_LEN;i++)
-    // {
-    //     tobe_eli[tobe_eli_row].dat[i]^=elitor[eli_row].dat[i];
-    // }
+    for(int i=ARR_LEN-1;i>=0;i--)
+    {
+        if(tobe_eli[tobe_eli_row].dat[i])
+        {
+            int t=std::__lg(tobe_eli[tobe_eli_row].dat[i]);
+            tobe_eli[tobe_eli_row].first=i*31+t;
+            return;
+        }
+    }
+    tobe_eli[tobe_eli_row].first=0;
+}
+
+void avx256_xor(int eli_row,int tobe_eli_row)
+{
+    int ii=0;
+    for(;ii+8<ARR_LEN;ii+=8)
+    {
+        __m256i tobe_pack=_mm256_load_si256((__m256i*)(tobe_eli[tobe_eli_row].dat+ii));
+        __m256i elitor_pack=_mm256_load_si256((__m256i*)(elitor[eli_row].dat+ii));
+        tobe_pack=_mm256_xor_si256(tobe_pack,elitor_pack);
+        _mm256_store_si256((__m256i*)(tobe_eli[tobe_eli_row].dat+ii),tobe_pack);
+    }
+    for(;ii<ARR_LEN;ii++)
+    {
+        tobe_eli[tobe_eli_row].dat[ii]^=elitor[eli_row].dat[ii];
+    }
     for(int i=ARR_LEN-1;i>=0;i--)
     {
         if(tobe_eli[tobe_eli_row].dat[i])
@@ -211,8 +225,9 @@ double common()
     return get_time();
 }
 
-void sse128()
+double sse128()
 {
+    set_time(tm_start);
     for(int i=0;i<ELI_NUM;i++)
     {
         while(tobe_eli[i].first)
@@ -227,6 +242,29 @@ void sse128()
             }
         }
     }
+    set_time(tm_end);
+    return get_time();
+}
+
+double avx256()
+{
+    set_time(tm_start);
+    for(int i=0;i<ELI_NUM;i++)
+    {
+        while(tobe_eli[i].first)
+        {
+            int f=tobe_eli[i].first;
+            if(elitor[f].first)
+                avx256_xor(f,i);
+            else
+            {
+                elitor[f]=tobe_eli[i];
+                break;
+            }
+        }
+    }
+    set_time(tm_end);
+    return get_time();
 }
 
 void check_ans()
@@ -244,13 +282,20 @@ void check_ans()
 int main()
 {
     std::ios::sync_with_stdio(0);
+    std::cout<<std::fixed<<std::setprecision(3);
     read_data();
     double time1=common();
     check_ans();
-    std::cout<<"time1="<<std::fixed<<std::setprecision(3)<<time1<<"ms"<<std::endl;
+    std::cout<<"common time="<<time1<<"ms"<<std::endl;
 
-    // read_data();
-    // sse128();
-    // check_ans();
+    read_data();
+    double time2=sse128();
+    check_ans();
+    std::cout<<"sse128 time="<<time2<<"ms"<<std::endl;
+
+    read_data();
+    double time3=avx256();
+    check_ans();
+    std::cout<<"avx256 time="<<time3<<"ms"<<std::endl;
     return 0;
 }

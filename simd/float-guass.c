@@ -41,10 +41,10 @@ double get_time()
 
 float **alloc_mat(int size)
 {
-    float **m = malloc(sizeof(float *) * size);
+    float **m = (float **)aligned_alloc(sizeof(float *) * size ,32);
     for (int i = 0; i < size; i++)
     {
-        m[i] = (float *)malloc(sizeof(float) * size);
+        m[i] = (float *)aligned_alloc(sizeof(float) * size,sizeof(float)*8);
         for (int j = 0; j < size; j++)
         {
             if (i > j)
@@ -56,6 +56,23 @@ float **alloc_mat(int size)
         }
     }
     return m;
+}
+
+void free_mat(int size,float **mat)
+{
+    if(mat)
+    {
+        for(int i=0;i<size;i++)
+        {
+            if(mat[i])
+            {
+                free(mat[i]);
+                mat[i]=NULL;
+            }
+        }
+        free(mat);
+        mat=NULL;
+    }
 }
 
 void shuffle_mat(int size, float **mat)
@@ -87,10 +104,10 @@ void print_mat(int size, float **mat)
 
 float **copy_mat(int size, float **mat)
 {
-    float **m = malloc(sizeof(float *) * size);
+    float **m = (float **)aligned_alloc(sizeof(float *) * size,32);
     for (int i = 0; i < size; i++)
     {
-        m[i] = (float *)malloc(sizeof(float) * size);
+        m[i] = (float *)aligned_alloc(sizeof(float) * size,sizeof(float)*8);
         for (int j = 0; j < size; j++)
         {
             m[i][j] = mat[i][j];
@@ -218,14 +235,14 @@ float **simd_alianed256_guass(int size, float **mat)
             {
                 // assert(((unsigned int))%32==0);
                 printf("%p\n", m[k] + beg_ind + 8 * j);
-                m_k[j] = _mm256_loadu_ps(m[k] + beg_ind + 8 * j);
-                // m_i[j]=_mm256_loadu_ps(m[i]+beg_ind+8*j);
+                m_k[j] = _mm256_load_ps(m[k] + beg_ind + 8 * j);
+                m_i[j]=_mm256_load_ps(m[i]+beg_ind+8*j);
 
-                // m[i][j] = m[i][j] - m[i][k] * m[k][j];
-                // m_k[j]=_mm256_mul_ps(m_ik,m_k[j]);
-                // m_i[j]=_mm256_sub_ps(m_i[j],m_k[j]);
+                m[i][j] = m[i][j] - m[i][k] * m[k][j];
+                m_k[j]=_mm256_mul_ps(m_ik,m_k[j]);
+                m_i[j]=_mm256_sub_ps(m_i[j],m_k[j]);
 
-                // _mm256_storeu_ps(m[i]+beg_ind+8*j,m_i[j]);
+                _mm256_store_ps(m[i]+beg_ind+8*j,m_i[j]);
             }
             m[i][k] = 0;
             free(m_k);
@@ -260,15 +277,21 @@ void test_size(int n)
     float **mat2 = copy_mat(n, mat);
     assert(comp_mat(n, mat, mat2));
     shuffle_mat(n, mat);
+    printf("1\n");
 
     float **mat_g = common_guass(n, mat);
     float **mat2_g = simd_alianed128_guass(n, mat);
     assert(comp_mat(n, mat_g, mat2_g));
-    // float **mat3_g = simd_alianed256_guass(n, mat);
-    // assert(comp_mat_with_iden(mat_g, mat3_g));
-    free(mat), free(mat2), free(mat_g);
-    free(mat2_g);
-    // free(mat3_g);
+    float **mat3_g = simd_alianed256_guass(n, mat);
+    assert(comp_mat(n, mat_g, mat3_g));
+
+    printf("2\n");
+
+    free_mat(n,mat);
+    free_mat(n,mat2);
+    free_mat(n,mat_g);
+    free_mat(n,mat2_g);
+    free_mat(n,mat3_g);
 }
 
 int main()
@@ -276,14 +299,16 @@ int main()
     srand(time(0));
     int n = 40;
 
-    while (n < 1001)
-    {
-        test_size(n);
+    test_size(8);
 
-        if (n < 1000)
-            n += 80;
-        else
-            n += 1000;
-    }
+    // while (n < 1001)
+    // {
+    //     test_size(n);
+
+    //     if (n < 1000)
+    //         n += 80;
+    //     else
+    //         n += 1000;
+    // }
     return 0;
 }
