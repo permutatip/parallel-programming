@@ -57,7 +57,7 @@ float *alloc_mat(int size)
     return m;
 }
 
-void free_mat(int size,float *mat)
+void free_mat(float *mat)
 {
     if(mat)
     {
@@ -113,11 +113,6 @@ float *common_guass(int size, float *mat)
     set_time(tm_start);
     for (int k = 0; k < size; k++)
     {
-        if (fabs(m[k*size+k]) <= EPS)
-        {
-            printf("m[%d][%d] of size%d is zero\n", k, k, size);
-            exit(1);
-        }
         for (int j = k + 1; j < size; j++)
         {
             m[k*size+j] = m[k*size+j] / m[k*size+k];
@@ -134,7 +129,7 @@ float *common_guass(int size, float *mat)
         // print_mat(size,m);
     }
     set_time(tm_end);
-    printf("common:%d %fms\n", size, get_time());
+    printf("common:%d %.3fms\n", size, get_time());
     return m;
 }
 
@@ -144,18 +139,12 @@ float *simd_alianed128_guass(int size, float *mat)
     set_time(tm_start);
     for (int k = 0; k < size; k++)
     {
-        if (fabs(m[k*size+k]) <= EPS)
-        {
-            printf("m[%d][%d] of size%d is zero\n", k, k, size);
-            exit(1);
-        }
         for (int j = k + 1; j < size; j++)
         {
             m[k*size+j] = m[k*size+j] / m[k*size+k];
         }
         m[k*size+k] = 1.0;
 
-        assert(size % 4 == 0); // to simplify the problem
         for (int i = k + 1; i < size; i++)
         {
             int pad_size = (size - k - 1) / 4;
@@ -167,26 +156,20 @@ float *simd_alianed128_guass(int size, float *mat)
             }
             // aligned part
             __m128 m_ik = _mm_set_ps1(m[i*size+k]);              // const part
-            __m128 *m_k = malloc(sizeof(__m128) * pad_size); // row k
-            __m128 *m_i = malloc(sizeof(__m128) * pad_size); // row i
             for (int j = 0; j < pad_size; j++)
             {
-                m_k[j] = _mm_load_ps(m+ k*size + beg_ind + 4 * j);
-                m_i[j] = _mm_load_ps(m+ i*size + beg_ind + 4 * j);
-
+                __m128 m_kj = _mm_load_ps(m+ k*size + beg_ind + 4 * j);
+                __m128 m_ij = _mm_load_ps(m+ i*size + beg_ind + 4 * j);
                 // m[i*size+j] = m[i*size+j] - m[i*size+k] * m[k*size+j];
-                m_k[j] = _mm_mul_ps(m_ik, m_k[j]);
-                m_i[j] = _mm_sub_ps(m_i[j], m_k[j]);
-
-                _mm_store_ps(m+ i*size + beg_ind + 4 * j, m_i[j]);
+                m_kj = _mm_mul_ps(m_ik, m_kj);
+                m_ij = _mm_sub_ps(m_ij, m_kj);
+                _mm_store_ps(m+ i*size + beg_ind + 4 * j, m_ij);
             }
-            free(m_k);
-            free(m_i);
             m[i*size+k] = 0;
         }
     }
     set_time(tm_end);
-    printf("sse128:%d %fms\n", size, get_time());
+    printf("sse128:%d %.3fms\n", size, get_time());
     return m;
 }
 
@@ -196,13 +179,11 @@ float *simd_alianed256_guass(int size, float *mat)
     set_time(tm_start);
     for (int k = 0; k < size; k++)
     {
-        assert(m[k*size+k] != 0);
         for (int j = k + 1; j < size; j++)
         {
             m[k*size+j] = m[k*size+j] / m[k*size+k];
         }
         m[k*size+k] = 1.0;
-        assert(size % 8 == 0); // to simplify the problem
         for (int i = k + 1; i < size; i++)
         {
             int pad_size = (size - k - 1) / 8;
@@ -214,25 +195,20 @@ float *simd_alianed256_guass(int size, float *mat)
             }
             // aligned part
             __m256 m_ik = _mm256_set1_ps(m[i*size+k]);           // const part
-            __m256 *m_k = malloc(sizeof(__m256) * pad_size); // row k
-            __m256 *m_i = malloc(sizeof(__m256) * pad_size); // row i
             for (int j = 0; j < pad_size; j++)
             {
-                m_k[j] = _mm256_load_ps(m+ k*size + beg_ind + 8 * j);
-                m_i[j]=_mm256_load_ps(m+ i*size+beg_ind+8*j);
+                __m256 m_kj = _mm256_load_ps(m+ k*size + beg_ind + 8 * j);
+                __m256 m_ij=_mm256_load_ps(m+ i*size+beg_ind+8*j);
                 // m[i*size+j] = m[i*size+j] - m[i*size+k] * m[k*size+j];
-                m_k[j]=_mm256_mul_ps(m_ik,m_k[j]);
-                m_i[j]=_mm256_sub_ps(m_i[j],m_k[j]);
-
-                _mm256_store_ps(m+ i*size+beg_ind+8*j,m_i[j]);
+                m_kj=_mm256_mul_ps(m_ik,m_kj);
+                m_ij=_mm256_sub_ps(m_ij,m_kj);
+                _mm256_store_ps(m+ i*size+beg_ind+8*j,m_ij);
             }
             m[i*size+k] = 0;
-            free(m_k);
-            free(m_i);
         }
     }
     set_time(tm_end);
-    printf("avx256:%d %fms\n", size, get_time());
+    printf("avx256:%d %.3fms\n", size, get_time());
     return m;
 }
 
@@ -266,11 +242,11 @@ void test_size(int n)
     float *mat3_g = simd_alianed256_guass(n, mat);
     assert(comp_mat(n, mat_g, mat3_g));
 
-    free_mat(n,mat);
-    free_mat(n,mat2);
-    free_mat(n,mat_g);
-    free_mat(n,mat2_g);
-    free_mat(n,mat3_g);
+    free_mat(mat);
+    free_mat(mat2);
+    free_mat(mat_g);
+    free_mat(mat2_g);
+    free_mat(mat3_g);
 }
 
 int main()
@@ -278,16 +254,10 @@ int main()
     srand(time(0));
     int n = 40;
 
-    test_size(80);
-
-    // while (n < 1001)
-    // {
-    //     test_size(n);
-
-    //     if (n < 1000)
-    //         n += 80;
-    //     else
-    //         n += 1000;
-    // }
+    while (n <= 1000)
+    {
+        test_size(n);
+        n+=80;
+    }
     return 0;
 }
