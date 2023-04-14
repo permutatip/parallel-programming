@@ -6,7 +6,7 @@
 #include<iomanip>
 #include<algorithm>
 
-#include<immintrin.h>
+#include<arm_neon.h>
 
 //----linux timer----
 #ifdef __linux
@@ -39,9 +39,9 @@ double get_time()
 #error "Not linux or windows, can not excute."
 #endif
 
-#define COL 85401
-#define ELI_NUM 5724
-#define TOBE_ELI_NUM 756
+#define COL 3799
+#define ELI_NUM 2759
+#define TOBE_ELI_NUM 1953
 #define ARR_LEN (COL/31+1)
 
 struct mat_row
@@ -49,13 +49,21 @@ struct mat_row
     /* data */
     int dat[ARR_LEN];
     int first;
-}__attribute__ ((aligned (32)));
+};//__attribute__ ((aligned (32)));
 
 mat_row tobe_eli[TOBE_ELI_NUM],elitor[COL+1],ans[TOBE_ELI_NUM];
-
-const char path1[]="./Groebner/11_85401_5724_756/1.txt";//消元子
-const char path2[]="./Groebner/11_85401_5724_756/2.txt";//被消元行
-const char path3[]="./Groebner/11_85401_5724_756/3.txt";//消元结果
+/*
+1_130_22_8
+2_254_106_53
+3_562_170_53
+4_1011_539_263
+5_2362_1226_453
+6_3799_2759_1953
+*/
+char line[10000];//1_130_22_8
+const char path1[]="/home/data/Groebner/6_3799_2759_1953/1.txt";//消元子
+const char path2[]="/home/data/Groebner/6_3799_2759_1953/2.txt";//被消元行
+const char path3[]="/home/data/Groebner/6_3799_2759_1953/3.txt";//消元结果
 
 void show_mat(mat_row mat[],int len)
 {
@@ -152,15 +160,20 @@ void row_xor(int eli_row,int tobe_eli_row)
     tobe_eli[tobe_eli_row].first=0;
 }
 
-void sse128_xor(int eli_row,int tobe_eli_row)
+void neon64_xor(int eli_row,int tobe_eli_row)
 {
     int ii=0;
-    for(;ii+4<ARR_LEN;ii+=4)
+    // std::cout<<eli_row<<" "<<tobe_eli_row<<std::endl;
+    for(;ii+2<ARR_LEN;ii+=2)
     {
-        __m128i tobe_pack=_mm_stream_load_si128((__m128i*)(tobe_eli[tobe_eli_row].dat+ii));
-        __m128i elitor_pack=_mm_stream_load_si128((__m128i*)(elitor[eli_row].dat+ii));
-        __m128i ans_pack=_mm_xor_si128(tobe_pack,elitor_pack);
-        _mm_store_si128((__m128i*)(tobe_eli[tobe_eli_row].dat+ii),ans_pack);
+        // __m128i tobe_pack=_mm_stream_load_si128((__m128i*)(tobe_eli[tobe_eli_row].dat+ii));
+        // __m128i elitor_pack=_mm_stream_load_si128((__m128i*)(elitor[eli_row].dat+ii));
+        // __m128i ans_pack=_mm_xor_si128(tobe_pack,elitor_pack);
+        // _mm_store_si128((__m128i*)(tobe_eli[tobe_eli_row].dat+ii),ans_pack);
+        int32x2_t tobe_pack=vld1_s32(tobe_eli[tobe_eli_row].dat+ii);
+        int32x2_t elitor_pack=vld1_s32(elitor[eli_row].dat+ii);
+        int32x2_t ans_pack=veor_s32(tobe_pack,elitor_pack);
+        vst1_s32(tobe_eli[tobe_eli_row].dat+ii,ans_pack);
     }
     for(;ii<ARR_LEN;ii++)
     {
@@ -178,15 +191,20 @@ void sse128_xor(int eli_row,int tobe_eli_row)
     tobe_eli[tobe_eli_row].first=0;
 }
 
-void avx256_xor(int eli_row,int tobe_eli_row)
+void neon128_xor(int eli_row,int tobe_eli_row)
 {
     int ii=0;
-    for(;ii+8<ARR_LEN;ii+=8)
+    for(;ii+4<ARR_LEN;ii+=4)
     {
-        __m256i tobe_pack=_mm256_load_si256((__m256i*)(tobe_eli[tobe_eli_row].dat+ii));
-        __m256i elitor_pack=_mm256_load_si256((__m256i*)(elitor[eli_row].dat+ii));
-        tobe_pack=_mm256_xor_si256(tobe_pack,elitor_pack);
-        _mm256_store_si256((__m256i*)(tobe_eli[tobe_eli_row].dat+ii),tobe_pack);
+        // __m256i tobe_pack=_mm256_load_si256((__m256i*)(tobe_eli[tobe_eli_row].dat+ii));
+        // __m256i elitor_pack=_mm256_load_si256((__m256i*)(elitor[eli_row].dat+ii));
+        // tobe_pack=_mm256_xor_si256(tobe_pack,elitor_pack);
+        // _mm256_store_si256((__m256i*)(tobe_eli[tobe_eli_row].dat+ii),tobe_pack);
+
+        int32x4_t tobe_pack=vld1q_s32(tobe_eli[tobe_eli_row].dat+ii);
+        int32x4_t elitor_pack=vld1q_s32(elitor[eli_row].dat+ii);
+        int32x4_t ans_pack=veorq_s32(tobe_pack,elitor_pack);
+        vst1q_s32(tobe_eli[tobe_eli_row].dat+ii,ans_pack);
     }
     for(;ii<ARR_LEN;ii++)
     {
@@ -225,7 +243,7 @@ double common()
     return get_time();
 }
 
-double sse128()
+double neon64()
 {
     set_time(tm_start);
     for(int i=0;i<ELI_NUM;i++)
@@ -234,7 +252,7 @@ double sse128()
         {
             int f=tobe_eli[i].first;
             if(elitor[f].first)
-                sse128_xor(f,i);
+                neon64_xor(f,i);
             else
             {
                 elitor[f]=tobe_eli[i];
@@ -246,7 +264,7 @@ double sse128()
     return get_time();
 }
 
-double avx256()
+double neon128()
 {
     set_time(tm_start);
     for(int i=0;i<ELI_NUM;i++)
@@ -255,7 +273,7 @@ double avx256()
         {
             int f=tobe_eli[i].first;
             if(elitor[f].first)
-                avx256_xor(f,i);
+                neon128_xor(f,i);
             else
             {
                 elitor[f]=tobe_eli[i];
@@ -289,13 +307,13 @@ int main()
     std::cout<<"common time="<<time1<<"ms"<<std::endl;
 
     read_data();
-    double time2=sse128();
+    double time2=neon64();
     check_ans();
-    std::cout<<"sse128 time="<<time2<<"ms"<<std::endl;
+    std::cout<<"neon64 time="<<time2<<"ms"<<std::endl;
 
     read_data();
-    double time3=avx256();
+    double time3=neon128();
     check_ans();
-    std::cout<<"avx256 time="<<time3<<"ms"<<std::endl;
+    std::cout<<"neon128 time="<<time3<<"ms"<<std::endl;
     return 0;
 }

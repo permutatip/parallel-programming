@@ -252,12 +252,11 @@ void test_size(int n)
 int main()
 {
     srand(time(0));
-    int n = 40;
-
-    while (n <= 1000)
+    int n = 256;
+    while(n<=1024)
     {
         test_size(n);
-        n+=80;
+        n*=2;
     }
     return 0;
 }
