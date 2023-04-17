@@ -37,29 +37,33 @@ double get_time()
 #endif
 
 #define THRD_CNT 4
-sem_t s1;
+sem_t s_parent;
+sem_t s_child;
 int mutex_sum=0;
 
 void* hello(void* thrd_arg)
 {
     int thrd_num=*(int*)thrd_arg;
-    printf("hello from thread%d\n",thrd_num);
+    printf("hello1 from thread%d\n",thrd_num);
+    sem_post(&s_parent);
+    sem_wait(&s_child);
+    printf("hello2 from thread%d\n",thrd_num);
     return NULL;
 }
 
 int main()
 {
     pthread_t* handle=malloc(THRD_CNT*sizeof(pthread_t));
-    for(int i=0;i<THRD_CNT;i++)
-    {
-        pthread_create(&handle[i],NULL,hello,(void*)&i);
-    }
+    sem_init(&s_parent,0,0);
+    sem_init(&s_child,0,0);
+    for(int i=0;i<THRD_CNT;i++) pthread_create(&handle[i],NULL,hello,(void*)&i);
+    for(int i=0;i<THRD_CNT;i++) sem_wait(&s_parent);
     printf("hello from main1\n");
-    for(int i=0;i<THRD_CNT;i++)
-    {
-        pthread_join(handle[i],NULL);
-    }
+    for(int i=0;i<THRD_CNT;i++) sem_post(&s_child);
+    for(int i=0;i<THRD_CNT;i++) pthread_join(handle[i],NULL);
     printf("hello from main2\n");
+    sem_destroy(&s_child);
+    sem_destroy(&s_parent);
     free(handle);
     return 0;
 }

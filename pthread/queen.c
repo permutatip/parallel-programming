@@ -34,6 +34,7 @@ double get_time()
 #include<stdlib.h>
 #include<assert.h>
 #include<pthread.h>
+#include<semaphore.h>
 typedef unsigned long long ull;
 ull queen(int n,int row,ull col,ull d1,ull d2);
 typedef struct task_arg
@@ -49,6 +50,8 @@ typedef struct thrd_arg
 }thrd_arg;
 task_arg* all_task;
 int task_cnt;
+sem_t s_parent;
+sem_t s_child;
 void* thrd_run(void* arg)
 {
     thrd_arg t_arg=*(thrd_arg*)arg;
@@ -59,6 +62,8 @@ void* thrd_run(void* arg)
         all_task[i].d1,all_task[i].d2);
     }
     printf("thrd %d ans:%llu\n",t_arg.thrd_id,ans);
+    sem_post(&s_parent);
+    sem_wait(&s_child);
     return NULL;
 }
 
@@ -108,6 +113,8 @@ int main(int argc,char*argv[])
         }
         assert(id==task_cnt);
         //thread begin
+        sem_init(&s_parent,0,0);
+        sem_init(&s_child,0,0);
         pthread_t* handle=malloc(sizeof(pthread_t)*thrd_cnt);
         int task_per_thrd=task_cnt/thrd_cnt;
         for(int i=1;i<=thrd_cnt;i++)
@@ -119,10 +126,13 @@ int main(int argc,char*argv[])
             // ta.thrd_id,ta.beg_task_id,ta.end_task_id);
             pthread_create(&handle[i-1],NULL,thrd_run,&ta);
         }
+        for(int i=0;i<thrd_cnt;i++) sem_wait(&s_parent);
+        for(int i=0;i<thrd_cnt;i++) sem_post(&s_child);
         for(int i=0;i<thrd_cnt;i++)
-        {
             pthread_join(handle[i],NULL);
-        }
+
+        sem_destroy(&s_child);
+        sem_destroy(&s_parent);
         free(handle);
     }
     return 0;
