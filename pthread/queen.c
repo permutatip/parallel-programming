@@ -34,7 +34,6 @@ double get_time()
 #include<stdlib.h>
 #include<assert.h>
 #include<pthread.h>
-#include<semaphore.h>
 typedef unsigned long long ull;
 ull queen(int n,int row,ull col,ull d1,ull d2);
 typedef struct task_arg
@@ -48,10 +47,10 @@ typedef struct thrd_arg
     int thrd_id;
     int beg_task_id,end_task_id;
 }thrd_arg;
+pthread_mutex_t mu;
 task_arg* all_task;
 int task_cnt;
-sem_t s_parent;
-sem_t s_child;
+ull global_cnt;
 void* thrd_run(void* arg)
 {
     thrd_arg t_arg=*(thrd_arg*)arg;
@@ -61,9 +60,10 @@ void* thrd_run(void* arg)
         ans+=queen(all_task[i].n,all_task[i].row,all_task[i].col,
         all_task[i].d1,all_task[i].d2);
     }
+    pthread_mutex_lock(&mu);
     printf("thrd %d ans:%llu\n",t_arg.thrd_id,ans);
-    sem_post(&s_parent);
-    sem_wait(&s_child);
+    global_cnt+=ans;
+    pthread_mutex_unlock(&mu);
     return NULL;
 }
 
@@ -91,11 +91,13 @@ int main(int argc,char*argv[])
         ull cnt=queen(size,0,0,0,0);
         set_time(tm_end);
         double t=get_time();
-        printf("common\nsize:%d ans:%15llu time:%20.3fms\n",size,cnt,t);
+        printf("  common size:%d ans:%15llu time:%20.3fms\n",size,cnt,t);
 
         //thread method
+        pthread_mutex_init(&mu,0);
         task_cnt=size*size-3*size+2;
         all_task=malloc(sizeof(task_arg)*task_cnt);
+        global_cnt=0;
         int id=0;
         //alloc task
         for(int i=0;i<size;i++)
@@ -113,8 +115,6 @@ int main(int argc,char*argv[])
         }
         assert(id==task_cnt);
         //thread begin
-        sem_init(&s_parent,0,0);
-        sem_init(&s_child,0,0);
         pthread_t* handle=malloc(sizeof(pthread_t)*thrd_cnt);
         int task_per_thrd=task_cnt/thrd_cnt;
         for(int i=1;i<=thrd_cnt;i++)
@@ -126,13 +126,12 @@ int main(int argc,char*argv[])
             // ta.thrd_id,ta.beg_task_id,ta.end_task_id);
             pthread_create(&handle[i-1],NULL,thrd_run,&ta);
         }
-        for(int i=0;i<thrd_cnt;i++) sem_wait(&s_parent);
-        for(int i=0;i<thrd_cnt;i++) sem_post(&s_child);
         for(int i=0;i<thrd_cnt;i++)
             pthread_join(handle[i],NULL);
 
-        sem_destroy(&s_child);
-        sem_destroy(&s_parent);
+        printf("%dthread size:%d ans:%15llu\n",thrd_cnt,size,global_cnt);
+        pthread_mutex_destroy(&mu);
+        free(all_task);
         free(handle);
     }
     return 0;
