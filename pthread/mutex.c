@@ -35,16 +35,23 @@ double get_time()
 #endif
 
 #define THRD_CNT 4
-int mutex_sum=0;
+long mutex_sum=0;
 pthread_mutex_t mu;
+
+typedef struct thrd_parm
+{
+    long thrd_id;
+}thrd_parm;
+
 
 void* hello(void* thrd_arg)
 {
-    int thrd_num=*(int*)thrd_arg;
-    pthread_mutex_trylock(&mu);
-    printf("hello from thread%d\n",thrd_num);
-    mutex_sum+=thrd_num;
+    thrd_parm* pack=(thrd_parm*)thrd_arg;
+    pthread_mutex_lock(&mu);
+    printf("hello from thread%ld\n",pack->thrd_id);
+    mutex_sum+=pack->thrd_id;
     pthread_mutex_unlock(&mu);
+    pthread_exit(0);
     return NULL;
 }
 
@@ -52,10 +59,16 @@ int main()
 {
     pthread_t* handle=malloc(THRD_CNT*sizeof(pthread_t));
     pthread_mutex_init(&mu,0);
-    for(int i=0;i<THRD_CNT;i++) pthread_create(handle+i,NULL,hello,&i);
+    printf("ans=%ld\n",mutex_sum);
+    thrd_parm* tmp=malloc(THRD_CNT*sizeof(thrd_parm));
+    for(long i=0;i<THRD_CNT;i++) 
+    {
+        tmp[i].thrd_id=i;
+        pthread_create(&handle[i],NULL,hello,&tmp[i]);
+    }
     for(int i=0;i<THRD_CNT;i++) pthread_join(handle[i],NULL);
-    printf("ans=%d\n",mutex_sum);
     pthread_mutex_destroy(&mu);
     free(handle);
+    printf("ans=%ld\n",mutex_sum);
     return 0;
 }
