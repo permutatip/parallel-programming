@@ -36,6 +36,7 @@ double get_time()
 #include<pthread.h>
 typedef unsigned long long ull;
 ull queen(int n,int row,ull col,ull d1,ull d2);
+ull qhalf(int n);
 typedef struct task_arg
 {
     int n;
@@ -59,11 +60,11 @@ void* thrd_run(void* arg)
     ull ans=0;
     for(int i=t_arg.beg_task_id;i<=t_arg.end_task_id;i++)
     {
-        ans+=queen(all_task[i].n,all_task[i].row,all_task[i].col,
+        ans+=2*queen(all_task[i].n,all_task[i].row,all_task[i].col,
         all_task[i].d1,all_task[i].d2);
     }
     pthread_mutex_lock(&mu);
-    printf("thrd %d ans:%llu\n",t_arg.thrd_id,ans);
+    // printf("thrd %d ans:%llu\n",t_arg.thrd_id,ans);
     global_cnt+=ans;
     pthread_mutex_unlock(&mu);
     return NULL;
@@ -83,28 +84,40 @@ ull queen(int n,int row,ull col,ull d1,ull d2)
     return count;
 }
 
+ull qhalf(int n)
+{
+    ull count=0;
+    int end_id=n/2-1;
+    for(int i=0;i<=end_id;i++)
+    {
+        count+=2*queen(n,1,1<<i,1<<(i+1),(i>0)?1<<(i-1):0);
+    }
+    if(n%2) count+=queen(n,1,1<<(n/2),1<<(n/2+1),1<<(n/2-1));
+    return count;
+}
+
 int main(int argc,char*argv[])
 {
     assert(argc==2);
     int thrd_cnt=atoi(argv[1]);
     for(int size=11;size<=16;size++)
     {
-        set_time(tm_start);
-        ull cnt=queen(size,0,0,0,0);
-        set_time(tm_end);
-        double t0=get_time();
-        printf(" common size:%d ans:%15llu time:%20.3fms\n",size,cnt,t0);
+        // set_time(tm_start);
+        // ull cnt=qhalf(size);
+        // set_time(tm_end);
+        // double t0=get_time();
+        // printf("common  size:%d ans:%15llu time:%20.3fms\n",size,cnt,t0);
 
         //thread method
         set_time(tm_start);//thread alloc begin
         pthread_mutex_init(&mu,0);
-        task_cnt=size*size-3*size+2;
+        task_cnt=size-2+(size-3)*(size/2-1);
         all_task=malloc(sizeof(task_arg)*task_cnt);
         all_args=malloc(sizeof(thrd_arg)*thrd_cnt);
         global_cnt=0;
         int id=0;
         //alloc task
-        for(int i=0;i<size;i++)
+        for(int i=0;i<size/2;i++)
         {
             for(int j=0;j<size;j++)
             {
@@ -119,8 +132,8 @@ int main(int argc,char*argv[])
         }
         assert(id==task_cnt);
         set_time(tm_end);//thread alloc end
-        double t1=get_time();
-        printf("thread alloc time:%f\n",t1);
+        // double t1=get_time();
+        // printf("thread alloc time:%f\n",t1);
         
         set_time(tm_start);//thread excute begin
         handle=malloc(sizeof(pthread_t)*thrd_cnt);
@@ -132,6 +145,24 @@ int main(int argc,char*argv[])
             all_args[i].thrd_id=i;
             pthread_create(&handle[i],NULL,thrd_run,&all_args[i]);
         }
+        //if size is odd,add the mid part using main thread
+        if(size%2)
+        {
+            ull local_ans=0;
+            int mid=size/2;
+            for(int i=0;i<size;i++)
+            {
+                if(abs(i-mid)<=1) continue;
+                ull arg1=1<<i|1<<mid;
+                ull arg2=1<<(i+1)|1<<(mid+2);
+                ull arg3=1<<(mid-2)|1<<(i-1);
+                local_ans+=queen(size,2,arg1,arg2,arg3);
+            }
+            pthread_mutex_lock(&mu);
+            // printf("thrd main ans:%llu\n",local_ans);
+            global_cnt+=local_ans;
+            pthread_mutex_unlock(&mu);
+        }
         for(int i=0;i<thrd_cnt;i++) pthread_join(handle[i],NULL);
         
         pthread_mutex_destroy(&mu);
@@ -142,6 +173,7 @@ int main(int argc,char*argv[])
         set_time(tm_end);//thread excute end
         double t2=get_time();
         printf("%dthread size:%d ans:%15llu time:%20.3fms\n",thrd_cnt,size,global_cnt,t2);
+        // assert(cnt==global_cnt);
     }
     return 0;
 }
