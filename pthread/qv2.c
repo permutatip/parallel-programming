@@ -64,7 +64,7 @@ void* thrd_run(void* arg)
         all_task[i].d1,all_task[i].d2);
     }
     pthread_mutex_lock(&mu);
-    // printf("thrd %d ans:%llu\n",t_arg.thrd_id,ans);
+    printf("thrd %d ans:%llu\n",t_arg.thrd_id,ans);
     global_cnt+=ans;
     pthread_mutex_unlock(&mu);
     return NULL;
@@ -96,17 +96,24 @@ ull qhalf(int n)
     return count;
 }
 
+static const ull correct_ans[]={
+1,1,0,0,2,10,4,40,92,//0~8
+352,724,2680,14200,73712,365596,2279184,//9~15
+14772512,95815104,666090624,4968057848//16~19
+};
+
 int main(int argc,char*argv[])
 {
     assert(argc==2);
     int thrd_cnt=atoi(argv[1]);
-    for(int size=11;size<=16;size++)
+    for(int size=16;size<=18;size++)
     {
         // set_time(tm_start);
         // ull cnt=qhalf(size);
         // set_time(tm_end);
         // double t0=get_time();
         // printf("common  size:%d ans:%15llu time:%20.3fms\n",size,cnt,t0);
+        // assert((unsigned long)size<sizeof(correct_ans)/sizeof(correct_ans[0])&&cnt==correct_ans[size]);
 
         //thread method
         set_time(tm_start);//thread alloc begin
@@ -132,8 +139,6 @@ int main(int argc,char*argv[])
         }
         assert(id==task_cnt);
         set_time(tm_end);//thread alloc end
-        // double t1=get_time();
-        // printf("thread alloc time:%f\n",t1);
         
         set_time(tm_start);//thread excute begin
         handle=malloc(sizeof(pthread_t)*thrd_cnt);
@@ -159,7 +164,7 @@ int main(int argc,char*argv[])
                 local_ans+=queen(size,2,arg1,arg2,arg3);
             }
             pthread_mutex_lock(&mu);
-            // printf("thrd main ans:%llu\n",local_ans);
+            printf("thrd main ans:%llu\n",local_ans);
             global_cnt+=local_ans;
             pthread_mutex_unlock(&mu);
         }
@@ -173,7 +178,7 @@ int main(int argc,char*argv[])
         set_time(tm_end);//thread excute end
         double t2=get_time();
         printf("%dthread size:%d ans:%15llu time:%20.3fms\n",thrd_cnt,size,global_cnt,t2);
-        // assert(cnt==global_cnt);
+        assert((unsigned long)size<sizeof(correct_ans)/sizeof(correct_ans[0])&&global_cnt==correct_ans[size]);
     }
     return 0;
 }

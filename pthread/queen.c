@@ -83,20 +83,27 @@ ull queen(int n,int row,ull col,ull d1,ull d2)
     return count;
 }
 
+static const ull correct_ans[]={
+1,1,0,0,2,10,4,40,92,//0~8
+352,724,2680,14200,73712,365596,2279184,//9~15
+14772512,95815104,666090624,4968057848//16~19
+};
+
 int main(int argc,char*argv[])
 {
     assert(argc==2);
     int thrd_cnt=atoi(argv[1]);
-    for(int size=11;size<=16;size++)
+    for(int size=18;size<=18;size++)
     {
-        set_time(tm_start);
-        ull cnt=queen(size,0,0,0,0);
-        set_time(tm_end);
-        double t0=get_time();
-        printf(" common size:%d ans:%15llu time:%20.3fms\n",size,cnt,t0);
+        // set_time(tm_start);
+        // ull cnt=queen(size,0,0,0,0);
+        // set_time(tm_end);
+        // double t0=get_time();
+        // printf(" common size:%d ans:%15llu time:%20.3fms\n",size,cnt,t0);
+        // assert((unsigned long)size<sizeof(correct_ans)/sizeof(correct_ans[0])&&correct_ans[size]==cnt);
 
         //thread method
-        set_time(tm_start);//thread alloc begin
+        // set_time(tm_start);//thread alloc begin
         pthread_mutex_init(&mu,0);
         task_cnt=size*size-3*size+2;
         all_task=malloc(sizeof(task_arg)*task_cnt);
@@ -118,9 +125,7 @@ int main(int argc,char*argv[])
             }
         }
         assert(id==task_cnt);
-        set_time(tm_end);//thread alloc end
-        double t1=get_time();
-        printf("thread alloc time:%f\n",t1);
+        // set_time(tm_end);//thread alloc end
         
         set_time(tm_start);//thread excute begin
         handle=malloc(sizeof(pthread_t)*thrd_cnt);
@@ -142,6 +147,7 @@ int main(int argc,char*argv[])
         set_time(tm_end);//thread excute end
         double t2=get_time();
         printf("%dthread size:%d ans:%15llu time:%20.3fms\n",thrd_cnt,size,global_cnt,t2);
+        assert((unsigned long)size<sizeof(correct_ans)/sizeof(correct_ans[0])&&correct_ans[size]==global_cnt);
     }
     return 0;
 }
