@@ -34,6 +34,10 @@ double get_time()
 #include<stdlib.h>
 #include<assert.h>
 typedef unsigned long long ull;
+#ifndef _OPENMP
+#error "this is a openmp file"
+#endif
+#include<omp.h>
 ull queen(int n,int row,ull col,ull d1,ull d2);
 ull qhalf(int n);
 
@@ -65,28 +69,46 @@ ull qhalf(int n)
     return count;
 }
 
+ull qhalf_omp(int n)
+{
+    ull count=0;
+    int end_id=n/2-1;
+    #pragma omp parallel for
+    for(int i=0;i<=end_id;i++)
+    {
+        count+=2*queen(n,1,1<<i,1<<(i+1),(i>0)?1<<(i-1):0);
+    }
+    if(n%2) count+=queen(n,1,1<<(n/2),1<<(n/2+1),1<<(n/2-1));
+    return count;
+}
+
 static const ull correct_ans[]={
 1,1,0,0,2,10,4,40,92,//0~8
 352,724,2680,14200,73712,365596,2279184,//9~15
 14772512,95815104,666090624,4968057848//16~19
 };
 
-int main(int argc,char*argv[])
+int main(int argc,char* argv[])
 {
     assert(argc==2);
     int thrd_cnt=atoi(argv[1]);
+    omp_set_num_threads(thrd_cnt);
     for(int size=11;size<=16;size++)
     {
         set_time(tm_start);
         ull cnt=qhalf(size);
         set_time(tm_end);
         double t0=get_time();
-        printf("common  size:%d ans:%15llu time:%20.3fms\n",size,cnt,t0);
+        printf("common size:%d ans:%15llu time:%20.3fms\n",size,cnt,t0);
         assert((unsigned long)size<sizeof(correct_ans)/sizeof(correct_ans[0])&&cnt==correct_ans[size]);
 
-        //thread method
-        set_time(tm_start);//thread alloc begin
-        //alloc task
+        //omp method
+        set_time(tm_start);
+        ull cnt2=qhalf_omp(size);
+        set_time(tm_end);
+        double t1=get_time();
+        printf("openmp size:%d ans:%15llu time:%20.3fms\n",size,cnt2,t1);
+        assert((unsigned long)size<sizeof(correct_ans)/sizeof(correct_ans[0])&&cnt2==correct_ans[size]);
     }
     return 0;
 }
