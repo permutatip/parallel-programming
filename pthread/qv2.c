@@ -64,7 +64,7 @@ void* thrd_run(void* arg)
         all_task[i].d1,all_task[i].d2);
     }
     pthread_mutex_lock(&mu);
-    printf("thrd %d ans:%llu\n",t_arg.thrd_id,ans);
+    // printf("thrd %d ans:%llu\n",t_arg.thrd_id,ans);
     global_cnt+=ans;
     pthread_mutex_unlock(&mu);
     return NULL;
@@ -106,7 +106,7 @@ int main(int argc,char*argv[])
 {
     assert(argc==2);
     int thrd_cnt=atoi(argv[1]);
-    for(int size=16;size<=18;size++)
+    for(int size=11;size<=16;size++)
     {
         // set_time(tm_start);
         // ull cnt=qhalf(size);
