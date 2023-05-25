@@ -32,12 +32,101 @@ double get_time()
 
 #include<mpi.h>
 #include<stdio.h>
-#include<stdlib.h>
-
+#include<assert.h>
 typedef unsigned long long ull;
+
+
+ull shift(int t,int size)
+{
+    if(t<0||t>=size) return 0;
+    return 1<<t;
+}
 ull queen(int n,int row,ull col,ull d1,ull d2);
-ull queen_cal(int n);
-ull qhalf(int n);
+ull serial_queen(int n);
+ull serial_half_queen(int n);
+
+ull coarse_grained_mpi_queen(int size,int myid,int numprocs)
+{
+    int size_per_id=(size+1)/numprocs;
+    int beg_id=size_per_id*myid;
+    int end_id=(myid==numprocs-1)?(size-1):(beg_id+size_per_id-1);
+    ull task_ans=0;
+    for(int j=beg_id;j<=end_id;j++)
+    {
+        ull col_arg=shift(j,size);
+        ull d1_arg=shift(j+1,size);
+        ull d2_arg=shift(j-1,size);
+        task_ans+=queen(size,1,col_arg,d1_arg,d2_arg);
+    }
+    ull final_ans=task_ans;
+    ull token=0;
+    if(myid==0)
+    {
+        for(int i=1;i<numprocs;i++)
+        {
+            MPI_Recv(&token,1,MPI_UNSIGNED_LONG_LONG,
+            i,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+            final_ans+=token;
+        }
+        // printf("final coarse ans:%18llu of size %d\n",final_ans,size);
+    }
+    else
+    {
+        //send subtask ans to task 0
+        MPI_Send(&task_ans,1,MPI_UNSIGNED_LONG_LONG,
+        0,0,MPI_COMM_WORLD);
+    }
+    // MPI_Barrier(MPI_COMM_WORLD);
+    return final_ans;
+}
+
+ull fine_grained_mpi_queen(int size,int myid,int numprocs)
+{
+    int num_of_task=size*size-3*size+2;
+    int size_per_id=(num_of_task+1)/numprocs;
+    int beg_id=size_per_id*myid;
+    int end_id=(myid==numprocs-1)?(num_of_task-1):(beg_id+size_per_id-1);
+    ull task_ans=0;
+    for(int k=beg_id;k<=end_id;k++)
+    {
+        int row1,row2;
+        if(k<=size-3)
+        {
+            row1=0,row2=k+2;
+        }
+        else
+        {
+            row1=(k-size+2)/(size-3)+1;
+            row2=(k-size+2)%(size-3);
+            if(row2>=row1-1) row2+=3;
+            if(row1==size) row1=size-1,row2=size-3;
+        }
+        // printf("row1:%d row2:%d id:%d\n",row1,row2,k);
+        ull col_arg=shift(row1,size)|shift(row2,size);
+        ull d1_arg=shift(row1+1,size)|shift(row2+2,size);
+        ull d2_arg=shift(row1-1,size)|shift(row2-2,size);
+        task_ans+=queen(size,2,col_arg,d1_arg,d2_arg);
+    }
+    ull final_ans=task_ans;
+    ull token=0;
+    if(myid==0)
+    {
+        for(int i=1;i<numprocs;i++)
+        {
+            MPI_Recv(&token,1,MPI_UNSIGNED_LONG_LONG,
+            i,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+            final_ans+=token;
+        }
+    }
+    else
+    {
+        //send subtask ans to task 0
+        MPI_Send(&task_ans,1,MPI_UNSIGNED_LONG_LONG,
+        0,0,MPI_COMM_WORLD);
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+    return final_ans;
+}
 ull queen(int n,int row,ull col,ull d1,ull d2)
 {
     if(row==n) return 1;
@@ -51,11 +140,11 @@ ull queen(int n,int row,ull col,ull d1,ull d2)
     }
     return count;
 }
-ull queen_cal(int n)
+ull serial_queen(int n)
 {
     return queen(n,0,0,0,0);
 }
-ull qhalf(int n)
+ull serial_half_queen(int n)
 {
     ull count=0;
     int end_id=n/2-1;
@@ -75,48 +164,53 @@ static const ull correct_ans[]={
 };
 int main(int argc,char* argv[])
 {
+    double serial_time[30];
+    for(int i=0;i<30;i++) serial_time[i]=-1.0;
+    int size;
+    for(size=11;size<=15;size++)
+    {
+        set_time(tm_start);
+        ull ans1=serial_queen(size);
+        set_time(tm_end);
+        assert(ans1==correct_ans[size]);
+        serial_time[size]=get_time();
+    }
+
     int myid,numprocs;
-    // int namelen;
-    // char name[MPI_MAX_PROCESSOR_NAME];
-    MPI_Init(&argc,&argv);
+    MPI_Init(0,0);
     MPI_Comm_rank(MPI_COMM_WORLD,&myid);
     MPI_Comm_size(MPI_COMM_WORLD,&numprocs);
-    // MPI_Get_processor_name(name,&namelen);
-    int size,beg_id,end_id;
-    for(size=8;size<=9;size++)
+    
+    for(size=11;size<=15;size++)
     {
-        int size_per_id=size/numprocs;
-        beg_id=size_per_id*myid;
-        end_id=(myid==numprocs-1)?(size-1):(beg_id+size_per_id-1);
-        ull task_ans=0;
-        for(int j=beg_id;j<=end_id;j++)
+        double time1,time2;
+        if(myid==0) set_time(tm_start);
+        ull ans2=coarse_grained_mpi_queen(size,myid,numprocs);
+        if(myid==0) 
         {
-            ull col_arg=1<<j;
-            ull d1_arg=1<<(j+1);
-            ull d2_arg=(j==0)?0:j-1;
-            task_ans+=queen(size,1,col_arg,d1_arg,d2_arg);
+            set_time(tm_end);
+            assert(ans2==correct_ans[size]);
+            time1=get_time();
         }
-        printf("size:%d ans:%llu from id%d begin%d end%d\n",
-        size,task_ans,myid,beg_id,end_id);
-        ull* ans_buffer=(ull*)malloc(sizeof(ull)*numprocs);
+
+        if(myid==0) set_time(tm_start);
+        ull ans3=fine_grained_mpi_queen(size,myid,numprocs);
+        if(myid==0) 
+        {
+            set_time(tm_end);
+            assert(ans3==correct_ans[size]);
+            time2=get_time();
+        }
+
         if(myid==0)
         {
-            ull final_ans=task_ans;
-            for(int i=1;i<numprocs;i++)
-            {
-                MPI_Recv(&task_ans,1,MPI_UNSIGNED_LONG_LONG,
-                i,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
-                final_ans+=task_ans;
-            }
-            printf("final ans:%18llu of size %d\n",final_ans,size);
+            printf("++++++size %d++++++\n",size);
+            printf("serial        :%10.3fms\n",serial_time[size]);
+            printf("coarse-grained:%10.3fms\n",time1);
+            printf("fine-grained  :%10.3fms\n",time2);
         }
-        else
-        {
-            MPI_Send(&task_ans,1,MPI_UNSIGNED_LONG_LONG,
-            0,0,MPI_COMM_WORLD);
-        }
-        MPI_Barrier(MPI_COMM_WORLD);
     }
     MPI_Finalize();
+    
     return 0;
 }
